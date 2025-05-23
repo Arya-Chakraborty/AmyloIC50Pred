@@ -1,11 +1,13 @@
 "use client"
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Contact = () => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const pathname = usePathname();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -49,7 +51,7 @@ const Contact = () => {
                             <Link href="/" className="flex items-center space-x-2" onClick={() => setMobileMenuOpen(false)}>
                                 <img
                                     src="logo.jpg"
-                                    alt="Amylo-IC50Pred Logo" 
+                                    alt="Amylo-IC50Pred Logo"
                                     className="h-8 w-auto"
                                 />
                                 <span className={`text-xl font-bold ${brandColors.tertiaryAccent}`}> {/* Using magenta for brand name */}
@@ -65,7 +67,10 @@ const Contact = () => {
                                     <Link
                                         key={link.name}
                                         href={link.path}
-                                        className={`text-gray-700 hover:text-amber-600 px-3 py-2 rounded-md text-sm font-medium transition-colors ${link.path === '/contact' ? `font-semibold ${brandColors.tertiaryAccent}` : ''}`}
+                                        className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${pathname === link.path
+                                            ? `text-amber-600 font-semibold`
+                                            : 'text-gray-700 hover:text-amber-600'
+                                            }`}
                                     >
                                         {link.name}
                                     </Link>
@@ -110,7 +115,10 @@ const Contact = () => {
                                     <Link
                                         key={link.name}
                                         href={link.path}
-                                        className={`block px-3 py-2 rounded-md text-base font-medium ${link.path === '/contact' ? `${brandColors.tertiaryAccent}` : 'text-gray-700'} hover:text-amber-600 ${brandColors.hoverBgLight} transition-colors`}
+                                        className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${pathname === link.path
+                                            ? `text-fuchsia-700 bg-fuchsia-50`
+                                            : 'text-gray-700 hover:text-amber-600 hover:bg-gray-100'
+                                            }`}
                                         onClick={() => setMobileMenuOpen(false)}
                                     >
                                         {link.name}
@@ -149,7 +157,7 @@ const Contact = () => {
                                 </p>
                                 <a
                                     href="mailto:alokjain@bitmesra.ac.in"
-                                    className={`text-lg ${brandColors.textDark} hover:text-amber-600 transition-colors inline-flex items-center gap-2 underline underline-offset-4 decoration-emerald-500/30 hover:decoration-emerald-500/50`} 
+                                    className={`text-lg ${brandColors.textDark} hover:text-amber-600 transition-colors inline-flex items-center gap-2 underline underline-offset-4 decoration-emerald-500/30 hover:decoration-emerald-500/50`}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />

@@ -1,5 +1,6 @@
 "use client"
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -10,7 +11,7 @@ import {
 
 // --- Configuration ---
 const MAX_COMPOUNDS = 20;
-const API_URL = 'https://meet-man-splendid.ngrok-free.app/api/predict'; 
+const API_URL = 'https://meet-man-splendid.ngrok-free.app/api/predict';
 // --- Helper Components / Icons ---
 const IconUpload = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
@@ -38,6 +39,7 @@ export default function Home() {
   const [barChartData, setBarChartData] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   const navLinks = [
     { name: 'Predict', path: '/' },
@@ -222,7 +224,7 @@ export default function Home() {
     try {
       const payload = { smiles: smilesToProcess };
       const res = await fetch(API_URL, {
-        method: 'POST', 
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -311,7 +313,10 @@ export default function Home() {
                   <Link
                     key={link.name}
                     href={link.path}
-                    className={`text-gray-700 hover:text-amber-600 px-3 py-2 rounded-md text-sm font-medium transition-colors ${link.path === '/' ? `font-semibold ${brandColors.tertiaryAccent}` : ''}`}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${pathname === link.path
+                      ? `text-amber-600 font-semibold`
+                      : 'text-gray-700 hover:text-amber-600'
+                      }`}
                   >
                     {link.name}
                   </Link>
@@ -356,7 +361,10 @@ export default function Home() {
                   <Link
                     key={link.name}
                     href={link.path}
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${link.path === '/' ? `${brandColors.tertiaryAccent}` : 'text-gray-700'} hover:text-amber-600 ${brandColors.hoverBgLight} transition-colors`}
+                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${pathname === link.path
+                        ? `text-fuchsia-700 bg-fuchsia-50`
+                        : 'text-gray-700 hover:text-amber-600 hover:bg-gray-100'
+                      }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     {link.name}
@@ -377,12 +385,11 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="max-w-3xl mx-auto"
             >
-              <h1 className={`text-3xl sm:text-4xl font-bold mb-4 ${brandColors.textDark}`}>
+              <h1 className={`text-3xl sm:text-4xl font-bold mb-4 ${brandColors.tertiaryAccent}`}>
                 Amylo-IC₅₀Pred
               </h1>
               <p className="text-base sm:text-sm text-gray-600 mt-4 leading-relaxed">
-                Predict inhibitory activity (IC50) of compounds against Amyloid beta aggregation and classify them into different classes
-              </p>
+                Amylo-IC₅₀Pred is capable of categorizing molecules into decoys and inhibitors, then further categorizing them into their respective classes and ultimately predicting the absolute IC50 value.              </p>
             </motion.div>
           </header>
 
@@ -540,13 +547,13 @@ export default function Home() {
                         <div style={{ width: '100%', height: 350 }}>
                           <ResponsiveContainer>
                             <PieChart>
-                              <Pie 
-                                data={pieChartData} 
-                                dataKey="value" 
-                                nameKey="name" 
-                                cx="50%" 
-                                cy="50%" 
-                                outerRadius={100} 
+                              <Pie
+                                data={pieChartData}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={100}
                                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                               >
                                 {pieChartData.map((entry, index) => (
