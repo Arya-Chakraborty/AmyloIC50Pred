@@ -362,8 +362,8 @@ export default function Home() {
                     key={link.name}
                     href={link.path}
                     className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${pathname === link.path
-                        ? `text-fuchsia-700 bg-fuchsia-50`
-                        : 'text-gray-700 hover:text-amber-600 hover:bg-gray-100'
+                      ? `text-fuchsia-700 bg-fuchsia-50`
+                      : 'text-gray-700 hover:text-amber-600 hover:bg-gray-100'
                       }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -496,15 +496,35 @@ export default function Home() {
                 {tableData.length > 0 && !results.error && (
                   <div className="mb-8">
                     <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4">Results Summary</h3>
+
+                    {/* Color-coded legend */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Inhibitor Potency Classes:</h4>
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                        <div className="flex items-center">
+                          <span className="w-3 h-3 rounded-full bg-emerald-100 border border-emerald-300 mr-2"></span>
+                          <span><span className="font-medium">Class 0</span>: Most Potent Inhibitors</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-3 h-3 rounded-full bg-violet-100 border border-violet-300 mr-2"></span>
+                          <span><span className="font-medium">Class 1</span>: Moderately Potent Inhibitors</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="w-3 h-3 rounded-full bg-pink-100 border border-pink-300 mr-2"></span>
+                          <span><span className="font-medium">Class 2</span>: Poor Inhibitors</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Compound</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IC50</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">ID</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Compound</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Type</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Class</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">IC50</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -514,14 +534,14 @@ export default function Home() {
                               <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700 break-all max-w-xs truncate" title={item.smiles}>{item.smiles}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                  ${item.type === "Inhibitor" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
+                                    ${item.type === "Inhibitor" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
                                   {item.type}
                                 </span>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs">
                                 {item.class !== 'N/A' ? (
                                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                    ${item.class === 0 ? "bg-emerald-100 text-emerald-800" :
+                                        ${item.class === 0 ? "bg-emerald-100 text-emerald-800" :
                                       item.class === 1 ? "bg-violet-100 text-violet-800" :
                                         "bg-pink-100 text-pink-800"}`}>
                                     Class {item.class}

@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 import pickle as pkl
 from padelpy import from_smiles
+from flask_cors import CORS
 import os
 
 app = Flask(__name__)
+CORS(app)
 
 def smiles_to_descriptors(smiles_list, compiled_data_path):
     """
@@ -158,31 +160,34 @@ def ic50_regression(df):
         return pd.DataFrame()
     
     script_dir = os.path.dirname(__file__)
-    regression_model_path = os.path.join(script_dir, r'models\rf_model_regression.pkl')
-    compiled_data_csv = os.path.join(script_dir, r'datasets\Compiled_data.csv')
+    regression_model_path = os.path.join(script_dir, 'models', 'rf_model_regression.pkl')
+    compiled_data_csv = os.path.join(script_dir, 'datasets', 'Compiled_data.csv')
 
     with open(regression_model_path, 'rb') as f:
         regression_model = pkl.load(f)
+
     df_cols = pd.read_csv(compiled_data_csv)
-    df_cols = df_cols.iloc[:, 1:]
+    df_cols = df_cols.iloc[:, 1:]  # Drop first unnamed index column
     df_cols = df_cols.drop('IC50', axis=1, errors='ignore')
     cols = regression_model.feature_names_in_.tolist()
 
-    # Predict IC50 values for each sample
     y_pred = []
     for i in range(df.shape[0]):
         sample_df = pd.DataFrame(df.iloc[i, :]).T
-        sample_df = sample_df[cols]
-        pred = regression_model.predict(sample_df)[0]
+        regression_df = pd.concat((df_cols, sample_df), axis=0)
+        regression_df = regression_df.rank()
+        sample_df_ranked = regression_df[cols].iloc[-1:]  # Select only the last (current sample)
+        pred = regression_model.predict(sample_df_ranked)[0]
         y_pred.append(pred)
 
     # Coefficients for polynomial conversion to IC50 values
     coefficients = [7e-7, -0.00052, 0.1870, -10.123, 248.08]
     y_pred_ic50 = np.polyval(coefficients, y_pred)
-    
+
     # Prepare results DataFrame
     result_df = df[cols].copy()
     result_df['IC50'] = y_pred_ic50
+
     return result_df
 
 @app.route('/api/predict', methods=['POST'])
