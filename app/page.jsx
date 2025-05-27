@@ -39,6 +39,7 @@ export default function Home() {
   const [barChartData, setBarChartData] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [smilesToNames, setSmilesToNames] = useState({}); // Dictionary to map SMILES to compound names
   const pathname = usePathname();
 
   const navLinks = [
@@ -70,6 +71,7 @@ export default function Home() {
       const newTableData = results.predictions.map((item, index) => ({
         id: index + 1,
         smiles: item.smiles,
+        name: smilesToNames[item.smiles] || 'N/A', // Use the name from dictionary or 'N/A'
         type: item.classification.charAt(0).toUpperCase() + item.classification.slice(1),
         class: item.class !== null ? item.class : 'N/A',
         ic50: item.ic50 !== null ? item.ic50.toFixed(2) : 'N/A'
@@ -107,7 +109,7 @@ export default function Home() {
       setPieChartData([]);
       setBarChartData([]);
     }
-  }, [results]);
+  }, [results, smilesToNames]);
 
   const readFileContent = useCallback((file) => {
     return new Promise((resolve, reject) => {
@@ -128,7 +130,10 @@ export default function Home() {
 
   const parseFileContent = useCallback((fileContent, isBinary, fileName) => {
     let smilesFromFile = [];
+    let namesFromFile = [];
+    const localSmilesToNames = {}; // Local dictionary to map SMILES to names
     let localJsonSheet = [];
+    
     try {
       const workbook = XLSX.read(fileContent, { type: isBinary ? 'binary' : 'string', cellNF: false, cellDates: false });
       const sheetName = workbook.SheetNames[0];
@@ -139,15 +144,36 @@ export default function Home() {
       if (localJsonSheet.length > 0) {
         let startIndex = 0;
         const firstRowFirstCell = String(localJsonSheet[0][0] || "").trim().toLowerCase();
-        if (localJsonSheet.length > 1 &&
-          (firstRowFirstCell.includes("smiles") || firstRowFirstCell.includes("compound") || firstRowFirstCell.includes("molecule")) &&
-          firstRowFirstCell.length < 50) {
+        const firstRowSecondCell = localJsonSheet[0][1] ? String(localJsonSheet[0][1]).trim().toLowerCase() : "";
+        
+        // Check if first row contains headers
+        const hasHeaders = localJsonSheet.length > 1 &&
+          ((firstRowFirstCell.includes("smiles") || firstRowFirstCell.includes("compound") || firstRowFirstCell.includes("molecule")) &&
+          firstRowFirstCell.length < 50)
+        
+        if (hasHeaders) {
           startIndex = 1;
         }
 
-        smilesFromFile = localJsonSheet.slice(startIndex)
-          .map(row => (row && row[0]) ? String(row[0]).trim() : "")
-          .filter(s => s && s.length > 2 && !s.toLowerCase().includes("smiles") && !s.toLowerCase().includes("compound"));
+        // Process each row
+        localJsonSheet.slice(startIndex).forEach(row => {
+          if (row && row[0]) {
+            const smiles = String(row[0]).trim();
+            const name = row[1] ? String(row[1]).trim() : "";
+            
+            if (smiles && smiles.length > 2 && 
+                !smiles.toLowerCase().includes("smiles") && 
+                !smiles.toLowerCase().includes("compound")) {
+              smilesFromFile.push(smiles);
+              if (name) {
+                localSmilesToNames[smiles] = name;
+                namesFromFile.push(name);
+              } else {
+                namesFromFile.push("");
+              }
+            }
+          }
+        });
       }
     } catch (error) {
       console.error("Error processing file with XLSX:", error);
@@ -156,22 +182,46 @@ export default function Home() {
         let startIndex = 0;
         if (rows.length > 0) {
           const firstRowFirstCell = rows[0].split(/[,;\t]/)[0].trim().toLowerCase();
-          if (rows.length > 1 &&
+          const hasHeaders = rows.length > 1 &&
             (firstRowFirstCell.includes("smiles") || firstRowFirstCell.includes("compound") || firstRowFirstCell.includes("molecule")) &&
-            firstRowFirstCell.length < 50) {
+            firstRowFirstCell.length < 50;
+          
+          if (hasHeaders) {
             startIndex = 1;
           }
-          smilesFromFile = rows.slice(startIndex)
-            .map(row => row.split(/[,;\t]/)[0] ? row.split(/[,;\t]/)[0].trim() : "")
-            .filter(s => s && s.length > 2 && !s.toLowerCase().includes("smiles") && !s.toLowerCase().includes("compound"));
+
+          rows.slice(startIndex).forEach(row => {
+            const columns = row.split(/[,;\t]/);
+            if (columns[0]) {
+              const smiles = columns[0].trim();
+              const name = columns[1] ? columns[1].trim() : "";
+              
+              if (smiles && smiles.length > 2 && 
+                  !smiles.toLowerCase().includes("smiles") && 
+                  !smiles.toLowerCase().includes("compound")) {
+                smilesFromFile.push(smiles);
+                if (name) {
+                  localSmilesToNames[smiles] = name;
+                  namesFromFile.push(name);
+                } else {
+                  namesFromFile.push("");
+                }
+              }
+            }
+          });
         }
       } else {
-        throw new Error("Could not parse file. Ensure SMILES are in the first column of a valid Excel (xlsx, xls) or CSV file.");
+        throw new Error("Could not parse file. Ensure SMILES are in the first column and names in the second column of a valid Excel (xlsx, xls) or CSV file.");
       }
     }
+
     if (smilesFromFile.length === 0 && localJsonSheet && localJsonSheet.length > 0) {
       console.warn("File parsed but no valid SMILES extracted. Check first column and header logic.");
     }
+
+    // Update the global smilesToNames dictionary
+    setSmilesToNames(localSmilesToNames);
+    
     return smilesFromFile;
   }, []);
 
@@ -187,6 +237,7 @@ export default function Home() {
       }
       setSelectedFile(file); setFileName(file.name);
       setTextareaValue(''); setInputError(''); setResults(null);
+      setSmilesToNames({}); // Reset the names dictionary when a new file is selected
     } else {
       setSelectedFile(null); setFileName('');
     }
@@ -195,13 +246,14 @@ export default function Home() {
   const handleSubmit = async () => {
     setIsLoading(true); setResults(null); setInputError('');
     let smilesToProcess = [];
+    const localSmilesToNames = {};
 
     if (selectedFile) {
       try {
         const fileData = await readFileContent(selectedFile);
         smilesToProcess = parseFileContent(fileData.content, fileData.isBinary, selectedFile.name);
         if (smilesToProcess.length === 0) {
-          setInputError("No valid SMILES found in file. Check format (SMILES in first column, optional header).");
+          setInputError("No valid SMILES found in file. Check format (SMILES in first column, names in second column, optional header).");
           setIsLoading(false); return;
         }
       } catch (error) {
@@ -209,11 +261,26 @@ export default function Home() {
         setIsLoading(false); return;
       }
     } else if (textareaValue.trim() !== "") {
-      smilesToProcess = textareaValue.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+      // Process manual input (one per line in format: SMILES, Name)
+      const lines = textareaValue.split('\n').filter(line => line.trim());
+      
+      lines.forEach(line => {
+        const [smiles, ...nameParts] = line.split(',').map(item => item.trim());
+        const name = nameParts.join(', '); // Handle names that might contain commas
+        
+        if (smiles && smiles.length > 2) {
+          smilesToProcess.push(smiles);
+          if (name) {
+            localSmilesToNames[smiles] = name;
+          }
+        }
+      });
+
+      setSmilesToNames(localSmilesToNames);
     }
 
     if (smilesToProcess.length === 0) {
-      setInputError("No SMILES input. Enter in textarea or upload file.");
+      setInputError("No valid SMILES input. Enter in textarea (format: SMILES, Name) or upload file.");
       setIsLoading(false); return;
     }
     if (smilesToProcess.length > MAX_COMPOUNDS) {
@@ -243,7 +310,7 @@ export default function Home() {
 
   const clearInputs = () => {
     setTextareaValue(''); setSelectedFile(null); setFileName('');
-    setInputError(''); setResults(null);
+    setInputError(''); setResults(null); setSmilesToNames({});
     const fileInput = document.getElementById('fileUpload');
     if (fileInput) fileInput.value = null;
   };
@@ -261,12 +328,13 @@ export default function Home() {
   const handleExportCSV = () => {
     if (!tableData.length) return;
 
-    const headers = ["ID", "Compound (SMILES)", "Type", "Class", "IC50 (nM)"];
+    const headers = ["ID", "Compound (SMILES)", "Name", "Type", "Class", "IC50 (nM)"];
     const csvRows = [
       headers.join(','),
       ...tableData.map(item => [
         escapeCSVField(item.id),
         escapeCSVField(item.smiles),
+        escapeCSVField(item.name),
         escapeCSVField(item.type),
         escapeCSVField(item.class),
         escapeCSVField(item.ic50)
@@ -405,9 +473,9 @@ export default function Home() {
                 <textarea
                   id="smilesInput" rows={6}
                   className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm font-mono placeholder-gray-400"
-                  placeholder={`CCC,CCO\nCNC(=O)C1=CN=CN1\nMax ${MAX_COMPOUNDS} compounds, separated by comma or newline.`}
+                  placeholder={`CCC, Compound A\nCNC(=O)C1=CN=CN1, Compound B\nOne compound per line in format: SMILES, Name\nMax ${MAX_COMPOUNDS} compounds allowed`}
                   value={textareaValue}
-                  onChange={(e) => { setTextareaValue(e.target.value); setSelectedFile(null); setFileName(''); setInputError(''); setResults(null); }}
+                  onChange={(e) => { setTextareaValue(e.target.value); setSelectedFile(null); setFileName(''); setInputError(''); setResults(null); setSmilesToNames({}); }}
                   disabled={isLoading}
                 />
               </div>
@@ -426,7 +494,7 @@ export default function Home() {
                       </label>
                       <p className="pl-1">or drag and drop</p>
                     </div>
-                    <p className="text-xs text-gray-500">CSV, XLSX, XLS up to 1MB. SMILES in first column.</p>
+                    <p className="text-xs text-gray-500">CSV, XLSX, XLS up to 1MB. SMILES in first column, names in second column.</p>
                     {fileName && <p className="text-xs text-amber-600 mt-1">Selected: {fileName}</p>}
                   </div>
                 </div>
@@ -522,6 +590,7 @@ export default function Home() {
                           <tr>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">ID</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Compound</th>
+                            <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Name</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Type</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Class</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">IC50</th>
@@ -532,6 +601,7 @@ export default function Home() {
                             <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{item.id}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-700 break-all max-w-xs truncate" title={item.smiles}>{item.smiles}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-700">{item.name}</td>
                               <td className="px-4 py-3 whitespace-nowrap text-xs">
                                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                     ${item.type === "Inhibitor" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
