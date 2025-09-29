@@ -60,7 +60,36 @@ def smiles_to_descriptors(smiles_list, compiled_data_path):
     # Ensure column order matches reference dataset
     filtered_descriptors_df = filtered_descriptors_df[reference_descriptors]
 
-    return filtered_descriptors_df
+    # Get important descriptors data
+    important_descriptors = ['RDF20e', 'SpMin2_Bhm', 'WPSA-3', 'SpMin2_Bhe', 'RDF125i', 'RDF120s', 
+                           'RDF20i', 'ALogP', 'RDF20u', 'RDF135u', 'RDF20s', 'RDF20v', 'RDF135v', 
+                           'RDF115s', 'BCUTc-1h', 'RDF125u', 'RDF130m', 'RDF130u', 'BCUTw-1h', 
+                           'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
+                           'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
+                           'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
+                           'TDB3i', 'VR2_D', 'GATS2i']
+    
+    # Extract important descriptor values for each compound
+    important_descriptor_values = []
+    for idx in range(len(filtered_descriptors_df)):
+        compound_descriptors = {}
+        for desc in important_descriptors:
+            if desc in filtered_descriptors_df.columns:
+                value = filtered_descriptors_df.iloc[idx][desc]
+                try:
+                    # Handle empty strings, NaN, and other non-numeric values
+                    if pd.notna(value) and str(value).strip() != '':
+                        compound_descriptors[desc] = float(value)
+                    else:
+                        compound_descriptors[desc] = None
+                except (ValueError, TypeError):
+                    # If conversion to float fails, set to None
+                    compound_descriptors[desc] = None
+            else:
+                compound_descriptors[desc] = None
+        important_descriptor_values.append(compound_descriptors)
+
+    return filtered_descriptors_df, important_descriptor_values
 
 def preprocessing(df):
     """
@@ -83,8 +112,8 @@ def preprocessing(df):
     df_cols = pd.read_csv(compiled_data_path)
     df_cols = df_cols.iloc[:, 1:]
     
-    # Ensure only expected columns are present
-    df = df[df_cols.drop(['Class', 'IC50'], axis=1, errors='ignore').columns]
+    # Ensure only expected columns are present and make a copy
+    df = df[df_cols.drop(['Class', 'IC50'], axis=1, errors='ignore').columns].copy()
 
     # Convert all values to numeric
     for col in df:
@@ -221,7 +250,7 @@ def predict():
         compiled_data_csv = os.path.join(script_dir, r'datasets\Compiled_data.csv')
 
         # Process SMILES through the prediction pipeline
-        descriptors_df = smiles_to_descriptors(smiles_list, compiled_data_csv)
+        descriptors_df, important_descriptor_values = smiles_to_descriptors(smiles_list, compiled_data_csv)
         preprocessed_df = preprocessing(descriptors_df)
         di_df = decoy_inhibitor_classification(preprocessed_df.copy())
         
@@ -239,7 +268,8 @@ def predict():
                     'smiles': smiles,
                     'classification': 'decoy',
                     'class': None,
-                    'ic50': None
+                    'ic50': None,
+                    'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
                 })
         
         # Process inhibitors and add their predictions
@@ -253,7 +283,8 @@ def predict():
                         'smiles': smiles_list[idx],
                         'classification': 'inhibitor',
                         'class': int(row['Class']),
-                        'ic50': float(row['IC50'])
+                        'ic50': float(row['IC50']),
+                        'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
                     })
         
         return jsonify({'predictions': response})

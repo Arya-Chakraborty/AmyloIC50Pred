@@ -11,7 +11,7 @@ import {
 
 // --- Configuration ---
 const MAX_COMPOUNDS = 20;
-const API_URL = 'https://meet-man-splendid.ngrok-free.app/api/predict';
+const API_URL = 'http://127.0.0.1:5328/api/predict';
 // --- Helper Components / Icons ---
 const IconUpload = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
@@ -20,7 +20,7 @@ const IconUpload = () => (
 );
 
 const CHART_COLORS = {
-  Inhibitor: '#F59E0B', // Amber
+  Inhibitor: '#F59E0B', // Amber  
   Decoy: '#3B82F6', // Blue
   Class0: '#10B981', // Emerald
   Class1: '#8B5CF6', // Violet
@@ -71,10 +71,11 @@ export default function Home() {
       const newTableData = results.predictions.map((item, index) => ({
         id: index + 1,
         smiles: item.smiles,
-        name: smilesToNames[item.smiles] || 'N/A', // Use the name from dictionary or 'N/A'
+        name: smilesToNames[item.smiles] || 'N/A',
         type: item.classification.charAt(0).toUpperCase() + item.classification.slice(1),
         class: item.class !== null ? item.class : 'N/A',
-        ic50: item.ic50 !== null ? item.ic50.toFixed(2) : 'N/A'
+        ic50: item.ic50 !== null ? item.ic50.toFixed(2) : 'N/A',
+        ...item.descriptors || {}
       }));
       setTableData(newTableData);
 
@@ -328,7 +329,15 @@ export default function Home() {
   const handleExportCSV = () => {
     if (!tableData.length) return;
 
-    const headers = ["ID", "Compound (SMILES)", "Name", "Type", "Class", "IC50 (nM)"];
+    const descriptorList = ['RDF20e', 'SpMin2_Bhm', 'WPSA-3', 'SpMin2_Bhe', 'RDF125i', 'RDF120s', 
+                            'RDF20i', 'ALogP', 'RDF20u', 'RDF135u', 'RDF20s', 'RDF20v', 'RDF135v', 
+                            'RDF115s', 'BCUTc-1h', 'RDF125u', 'RDF130m', 'RDF130u', 'BCUTw-1h', 
+                            'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
+                            'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
+                            'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
+                            'TDB3i', 'VR2_D', 'GATS2i'];
+    
+    const headers = ["ID", "Compound (SMILES)", "Name", "Type", "Class", "IC50 (nM)", ...descriptorList];
     const csvRows = [
       headers.join(','),
       ...tableData.map(item => [
@@ -337,7 +346,10 @@ export default function Home() {
         escapeCSVField(item.name),
         escapeCSVField(item.type),
         escapeCSVField(item.class),
-        escapeCSVField(item.ic50)
+        escapeCSVField(item.ic50),
+        ...descriptorList.map(desc => escapeCSVField(
+          item[desc] !== null && item[desc] !== undefined ? item[desc].toFixed(4) : '0.0000'
+        ))
       ].join(','))
     ];
     const csvString = csvRows.join('\n');
@@ -565,6 +577,8 @@ export default function Home() {
                   <div className="mb-8">
                     <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4">Results Summary</h3>
 
+
+
                     {/* Color-coded legend */}
                     <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">Inhibitor Potency Classes:</h4>
@@ -594,6 +608,16 @@ export default function Home() {
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Type</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">Class</th>
                             <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-gray-800 uppercase tracking-wider">IC50</th>
+                            {/* Descriptor columns */}
+                            {['RDF20e', 'SpMin2_Bhm', 'WPSA-3', 'SpMin2_Bhe', 'RDF125i', 'RDF120s', 
+                              'RDF20i', 'ALogP', 'RDF20u', 'RDF135u', 'RDF20s', 'RDF20v', 'RDF135v', 
+                              'RDF115s', 'BCUTc-1h', 'RDF125u', 'RDF130m', 'RDF130u', 'BCUTw-1h', 
+                              'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
+                              'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
+                              'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
+                              'TDB3i', 'VR2_D', 'GATS2i'].map(desc => (
+                              <th key={desc} scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">{desc}</th>
+                            ))}
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -621,6 +645,18 @@ export default function Home() {
                               <td className={`px-4 py-3 whitespace-nowrap text-xs ${item.type === 'Inhibitor' && item.ic50 !== 'N/A' ? 'text-gray-700' : 'text-gray-400'}`}>
                                 {item.ic50}
                               </td>
+                              {/* Descriptor columns */}
+                              {['RDF20e', 'SpMin2_Bhm', 'WPSA-3', 'SpMin2_Bhe', 'RDF125i', 'RDF120s', 
+                                'RDF20i', 'ALogP', 'RDF20u', 'RDF135u', 'RDF20s', 'RDF20v', 'RDF135v', 
+                                'RDF115s', 'BCUTc-1h', 'RDF125u', 'RDF130m', 'RDF130u', 'BCUTw-1h', 
+                                'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
+                                'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
+                                'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
+                                'TDB3i', 'VR2_D', 'GATS2i'].map(desc => (
+                                <td key={desc} className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 font-mono">
+                                  {item[desc] !== null && item[desc] !== undefined ? item[desc].toFixed(4) : '0.0000'}
+                                </td>
+                              ))}
                             </tr>
                           ))}
                         </tbody>
