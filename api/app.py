@@ -5,9 +5,108 @@ import pickle as pkl
 from padelpy import from_smiles
 from flask_cors import CORS
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+import csv
+from io import StringIO
+import threading
 
 app = Flask(__name__)
 CORS(app)
+
+def send_results_email(user_email, results_data):
+    """
+    Send prediction results via email as CSV attachment
+    """
+    try:
+        # Create CSV content
+        csv_content = StringIO()
+        
+        # Define descriptor columns
+        descriptors = ['RDF20e', 'SpMin2_Bhm', 'WPSA-3', 'SpMin2_Bhe', 'RDF125i', 'RDF120s', 
+                      'RDF20i', 'ALogP', 'RDF20u', 'RDF135u', 'RDF20s', 'RDF20v', 'RDF135v', 
+                      'RDF115s', 'BCUTc-1h', 'RDF125u', 'RDF130m', 'RDF130u', 'BCUTw-1h', 
+                      'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
+                      'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
+                      'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
+                      'TDB3i', 'VR2_D', 'GATS2i']
+        
+        headers = ["ID", "Compound (SMILES)", "Type", "Class", "IC50 (nM)"] + descriptors
+        
+        writer = csv.writer(csv_content)
+        writer.writerow(headers)
+        
+        for idx, prediction in enumerate(results_data):
+            row = [
+                idx + 1,
+                prediction['smiles'],
+                prediction['classification'].capitalize(),
+                prediction['class'] if prediction['class'] is not None else 'N/A',
+                f"{prediction['ic50']:.2f}" if prediction['ic50'] is not None else 'N/A'
+            ]
+            
+            # Add descriptor values
+            for desc in descriptors:
+                if 'descriptors' in prediction and desc in prediction['descriptors']:
+                    value = prediction['descriptors'][desc]
+                    if value is not None:
+                        row.append(f"{value:.4f}")
+                    else:
+                        row.append('0.0000')
+                else:
+                    row.append('0.0000')
+            
+            writer.writerow(row)
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = "amyloic50pred@gmail.com"
+        msg['To'] = user_email
+        msg['Subject'] = "Amylo-IC50Pred Results - Large Batch Processing"
+        
+        body = f"""Dear User,
+
+Thank you for using Amylo-IC50Pred!
+
+Your large batch prediction job has been completed. Please find the results attached as a CSV file.
+
+Batch Summary:
+- Total compounds processed: {len(results_data)}
+- Results include molecular descriptors and IC50 predictions
+
+Best regards,
+Amylo-IC50Pred Team
+"""
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach CSV file
+        csv_data = csv_content.getvalue().encode('utf-8')
+        attachment = MIMEBase('application', 'octet-stream')
+        attachment.set_payload(csv_data)
+        encoders.encode_base64(attachment)
+        attachment.add_header(
+            'Content-Disposition',
+            f'attachment; filename="amylo-ic50pred-results-{len(results_data)}-compounds.csv"'
+        )
+        msg.attach(attachment)
+        
+        # Send email
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login("amyloic50pred@gmail.com", "cimo qaxo dwle rpag")
+        server.send_message(msg)
+        server.quit()
+        
+        print(f"Results email sent successfully to {user_email}")
+        return True
+        
+    except Exception as e:
+        print(f"Failed to send email to {user_email}: {str(e)}")
+        return False
 
 def smiles_to_descriptors(smiles_list, compiled_data_path):
     """
@@ -242,8 +341,16 @@ def predict():
             return jsonify({'error': 'No SMILES strings provided'}), 400
         
         smiles_list = data['smiles']
+        user_email = data.get('email', None)
+        
         if not isinstance(smiles_list, list):
             return jsonify({'error': 'SMILES should be provided as a list'}), 400
+        
+        # Check if this is a large batch that requires email processing
+        is_large_batch = len(smiles_list) > 20
+        
+        if is_large_batch and not user_email:
+            return jsonify({'error': 'Email is required for batches larger than 20 compounds'}), 400
 
         # Define paths to data files
         script_dir = os.path.dirname(__file__)
@@ -287,7 +394,27 @@ def predict():
                         'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
                     })
         
-        return jsonify({'predictions': response})
+        # Handle large batch processing with email
+        if is_large_batch:
+            # Process in background and send email
+            def process_large_batch():
+                try:
+                    send_results_email(user_email, response)
+                except Exception as e:
+                    print(f"Error processing large batch: {str(e)}")
+            
+            # Start background processing
+            thread = threading.Thread(target=process_large_batch)
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'message': 'Large batch processing started. Results will be sent to your email.',
+                'email': user_email,
+                'compound_count': len(smiles_list)
+            })
+        else:
+            return jsonify({'predictions': response})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

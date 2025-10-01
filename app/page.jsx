@@ -40,6 +40,8 @@ export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [smilesToNames, setSmilesToNames] = useState({}); // Dictionary to map SMILES to compound names
+  const [userEmail, setUserEmail] = useState(''); // User email for large batches
+  const [showEmailInput, setShowEmailInput] = useState(false); // Show email input for large batches
   const pathname = usePathname();
 
   const navLinks = [
@@ -244,6 +246,14 @@ export default function Home() {
     }
   };
 
+  const validateManualInput = (lines) => {
+    if (lines.length > MAX_COMPOUNDS) {
+      setInputError(`Manual input is limited to ${MAX_COMPOUNDS} compounds maximum. You provided ${lines.length} compounds.`);
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true); setResults(null); setInputError('');
     let smilesToProcess = [];
@@ -265,6 +275,12 @@ export default function Home() {
       // Process manual input (one per line in format: SMILES, Name)
       const lines = textareaValue.split('\n').filter(line => line.trim());
       
+      // Validate manual input count
+      if (!validateManualInput(lines)) {
+        setIsLoading(false);
+        return;
+      }
+      
       lines.forEach(line => {
         const [smiles, ...nameParts] = line.split(',').map(item => item.trim());
         const name = nameParts.join(', '); // Handle names that might contain commas
@@ -284,13 +300,32 @@ export default function Home() {
       setInputError("No valid SMILES input. Enter in textarea (format: SMILES, Name) or upload file.");
       setIsLoading(false); return;
     }
-    if (smilesToProcess.length > MAX_COMPOUNDS) {
-      setInputError(`Max ${MAX_COMPOUNDS} compounds allowed. You provided ${smilesToProcess.length}.`);
+
+    // Check if large batch and email is required
+    const isLargeBatch = smilesToProcess.length > MAX_COMPOUNDS;
+    if (isLargeBatch && !userEmail.trim()) {
+      setShowEmailInput(true);
+      setInputError(`You have ${smilesToProcess.length} compounds. For batches larger than ${MAX_COMPOUNDS}, please provide your email address.`);
       setIsLoading(false); return;
+    }
+
+    // Validate email format if provided
+    if (isLargeBatch && userEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(userEmail.trim())) {
+        setInputError("Please enter a valid email address.");
+        setIsLoading(false); return;
+      }
     }
 
     try {
       const payload = { smiles: smilesToProcess };
+      
+      // Add email for large batches
+      if (isLargeBatch) {
+        payload.email = userEmail.trim();
+      }
+      
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,7 +335,17 @@ export default function Home() {
       if (!res.ok) {
         setResults({ error: data.error || `Server Error: ${res.status}` });
       } else {
-        setResults(data);
+        // Handle large batch response
+        if (isLargeBatch && data.message) {
+          setResults({ 
+            message: data.message,
+            email: data.email,
+            compound_count: data.compound_count,
+            isLargeBatch: true
+          });
+        } else {
+          setResults(data);
+        }
       }
     } catch (err) {
       setResults({ error: `Network/Parsing Error: ${err.message}` });
@@ -312,6 +357,7 @@ export default function Home() {
   const clearInputs = () => {
     setTextareaValue(''); setSelectedFile(null); setFileName('');
     setInputError(''); setResults(null); setSmilesToNames({});
+    setUserEmail(''); setShowEmailInput(false);
     const fileInput = document.getElementById('fileUpload');
     if (fileInput) fileInput.value = null;
   };
@@ -519,6 +565,24 @@ export default function Home() {
               </motion.div>
             )}
 
+            {showEmailInput && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+                <label htmlFor="emailInput" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address (Required for large batches)
+                </label>
+                <input
+                  id="emailInput"
+                  type="email"
+                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm placeholder-gray-400"
+                  placeholder="Enter your email address"
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-gray-500 mt-1">Results will be sent to this email address after processing is complete.</p>
+              </motion.div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-4">
               <motion.button
                 onClick={handleSubmit}
@@ -570,6 +634,26 @@ export default function Home() {
                   <div className="p-4 bg-red-100 border border-red-300 rounded-md text-red-700">
                     <h3 className="text-lg font-semibold mb-1">API Error</h3>
                     <p className="text-sm">{results.error}</p>
+                  </div>
+                )}
+
+                {results.isLargeBatch && results.message && (
+                  <div className="p-6 bg-green-50 border border-green-300 rounded-md text-green-800">
+                    <h3 className="text-lg font-semibold mb-2">✓ Large Batch Processing Started</h3>
+                    <div className="space-y-2 text-sm">
+                      <p><strong>Status:</strong> {results.message}</p>
+                      <p><strong>Email:</strong> {results.email}</p>
+                      <p><strong>Compounds:</strong> {results.compound_count}</p>
+                      <div className="mt-3 p-3 bg-green-100 rounded">
+                        <p className="font-medium">What happens next?</p>
+                        <ul className="mt-1 text-xs list-disc list-inside space-y-1">
+                          <li>Your compounds are being processed in the background</li>
+                          <li>Results will be emailed to you as a CSV file</li>
+                          <li>You can safely close this page</li>
+                          <li>Processing typically takes 2-5 minutes depending on batch size</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 )}
 
