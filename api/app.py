@@ -207,7 +207,7 @@ def preprocessing(df):
         pd.DataFrame: Preprocessed DataFrame ready for model prediction
     """
     script_dir = os.path.dirname(__file__)
-    compiled_data_path = os.path.join(script_dir, r'datasets\Compiled_data.csv')
+    compiled_data_path = os.path.join(script_dir, 'datasets', 'Compiled_data.csv')
     df_cols = pd.read_csv(compiled_data_path)
     df_cols = df_cols.iloc[:, 1:]
     
@@ -225,7 +225,7 @@ def preprocessing(df):
         df[col] = np.clip(df[col], min_val, max_val)
 
     # Impute missing values using pre-trained imputer
-    imputer_model_path = os.path.join(script_dir, r'models\imputer_model.pkl')
+    imputer_model_path = os.path.join(script_dir, 'models', 'imputer_model.pkl')
     with open(imputer_model_path, 'rb') as f:
         imputer = pkl.load(f)
     df = imputer.transform(df)
@@ -244,7 +244,7 @@ def decoy_inhibitor_classification(df):
         pd.DataFrame: Original DataFrame with added 'D/I' column containing predictions
     """
     script_dir = os.path.dirname(__file__)
-    decoy_inhibitor_model_path = os.path.join(script_dir, r'models\decoy_inhibitor_rf.pkl')
+    decoy_inhibitor_model_path = os.path.join(script_dir, 'models', 'decoy_inhibitor_rf.pkl')
     with open(decoy_inhibitor_model_path, 'rb') as f:
         decoy_inhibitor = pkl.load(f)
     y_pred = decoy_inhibitor.predict(df)
@@ -262,7 +262,7 @@ def potency_classification(df):
         pd.DataFrame: Original DataFrame with added 'Class' column containing predictions
     """
     script_dir = os.path.dirname(__file__)
-    classifier_model_path = os.path.join(script_dir, r'models\HGB_model_potency_classifier.pkl')
+    classifier_model_path = os.path.join(script_dir, 'models', 'HGB_model_potency_classifier.pkl')
     with open(classifier_model_path, 'rb') as f:
         classifier = pkl.load(f)
     y_pred = classifier.predict(df)
@@ -354,7 +354,7 @@ def predict():
 
         # Define paths to data files
         script_dir = os.path.dirname(__file__)
-        compiled_data_csv = os.path.join(script_dir, r'datasets\Compiled_data.csv')
+        compiled_data_csv = os.path.join(script_dir, 'datasets', 'Compiled_data.csv')
 
         # Process SMILES through the prediction pipeline
         descriptors_df, important_descriptor_values = smiles_to_descriptors(smiles_list, compiled_data_csv)
