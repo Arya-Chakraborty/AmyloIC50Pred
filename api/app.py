@@ -13,9 +13,48 @@ from email import encoders
 import csv
 from io import StringIO
 import threading
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 CORS(app)
+
+# Database configuration
+
+def get_db_connection():
+    """Get database connection"""
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
+def check_user_exists(email):
+    """Check if user exists in database by email"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM users WHERE email = %s", (email,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return result is not None
+    except Exception as e:
+        print(f"Database error checking user: {e}")
+        return False
+
+def create_user(email, name, affiliation):
+    """Create new user in database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (email, name, affiliation) VALUES (%s, %s, %s)",
+            (email, name, affiliation)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Database error creating user: {e}")
+        return False
 
 def send_results_email(user_email, results_data):
     """
@@ -342,6 +381,8 @@ def predict():
         
         smiles_list = data['smiles']
         user_email = data.get('email', None)
+        user_name = data.get('name', None)
+        user_affiliation = data.get('affiliation', None)
         
         if not isinstance(smiles_list, list):
             return jsonify({'error': 'SMILES should be provided as a list'}), 400
@@ -351,6 +392,18 @@ def predict():
         
         if is_large_batch and not user_email:
             return jsonify({'error': 'Email is required for batches larger than 20 compounds'}), 400
+        
+        # For large batches, handle user registration
+        if is_large_batch:
+            user_exists = check_user_exists(user_email)
+            if not user_exists:
+                # New user - name and affiliation are required
+                if not user_name or not user_affiliation:
+                    return jsonify({'error': 'Name and affiliation are required for new users'}), 400
+                
+                # Create new user in database
+                if not create_user(user_email, user_name, user_affiliation):
+                    return jsonify({'error': 'Failed to register user. Please try again.'}), 500
 
         # Define paths to data files
         script_dir = os.path.dirname(__file__)
@@ -415,6 +468,24 @@ def predict():
             })
         else:
             return jsonify({'predictions': response})
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/check-user', methods=['POST'])
+def check_user():
+    """Check if user exists in database by email"""
+    try:
+        data = request.get_json()
+        if not data or 'email' not in data:
+            return jsonify({'error': 'Email is required'}), 400
+        
+        email = data['email'].strip()
+        if not email:
+            return jsonify({'error': 'Email cannot be empty'}), 400
+        
+        user_exists = check_user_exists(email)
+        return jsonify({'exists': user_exists})
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

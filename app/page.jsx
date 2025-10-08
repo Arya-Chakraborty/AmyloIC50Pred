@@ -42,6 +42,10 @@ export default function Home() {
   const [smilesToNames, setSmilesToNames] = useState({}); // Dictionary to map SMILES to compound names
   const [userEmail, setUserEmail] = useState(''); // User email for large batches
   const [showEmailInput, setShowEmailInput] = useState(false); // Show email input for large batches
+  const [userName, setUserName] = useState(''); // User name for registration
+  const [userAffiliation, setUserAffiliation] = useState(''); // User affiliation for registration
+  const [showRegistrationForm, setShowRegistrationForm] = useState(false); // Show registration form for new users
+  const [isCheckingUser, setIsCheckingUser] = useState(false); // Loading state for user check
   const pathname = usePathname();
 
   const navLinks = [
@@ -254,6 +258,61 @@ export default function Home() {
     return true;
   };
 
+  const checkUserExists = async (email) => {
+    try {
+      const response = await fetch('http://127.0.0.1:5328/api/check-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to check user');
+      }
+      return data.exists;
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setInputError('Failed to verify user. Please try again.');
+      return false;
+    }
+  };
+
+  const handleEmailSubmit = async () => {
+    if (!userEmail.trim()) {
+      setInputError('Please enter your email address.');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userEmail.trim())) {
+      setInputError('Please enter a valid email address.');
+      return;
+    }
+
+    setIsCheckingUser(true);
+    setInputError('');
+
+    try {
+      const userExists = await checkUserExists(userEmail);
+      
+      if (userExists) {
+        // User exists, proceed directly to prediction
+        setShowEmailInput(false);
+        setShowRegistrationForm(false);
+        handleSubmit();
+      } else {
+        // New user, show registration form
+        setShowEmailInput(false);
+        setShowRegistrationForm(true);
+      }
+    } catch (error) {
+      // Error already handled in checkUserExists
+    } finally {
+      setIsCheckingUser(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true); setResults(null); setInputError('');
     let smilesToProcess = [];
@@ -309,21 +368,16 @@ export default function Home() {
       setIsLoading(false); return;
     }
 
-    // Validate email format if provided
-    if (isLargeBatch && userEmail.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(userEmail.trim())) {
-        setInputError("Please enter a valid email address.");
-        setIsLoading(false); return;
-      }
-    }
-
     try {
       const payload = { smiles: smilesToProcess };
       
-      // Add email for large batches
+      // Add email and user details for large batches
       if (isLargeBatch) {
         payload.email = userEmail.trim();
+        if (userName.trim() && userAffiliation.trim()) {
+          payload.name = userName.trim();
+          payload.affiliation = userAffiliation.trim();
+        }
       }
       
       const res = await fetch(API_URL, {
@@ -358,6 +412,8 @@ export default function Home() {
     setTextareaValue(''); setSelectedFile(null); setFileName('');
     setInputError(''); setResults(null); setSmilesToNames({});
     setUserEmail(''); setShowEmailInput(false);
+    setUserName(''); setUserAffiliation(''); setShowRegistrationForm(false);
+    setIsCheckingUser(false);
     const fileInput = document.getElementById('fileUpload');
     if (fileInput) fileInput.value = null;
   };
@@ -577,16 +633,78 @@ export default function Home() {
                   placeholder="Enter your email address"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isLoading || isCheckingUser}
                 />
-                <p className="text-xs text-gray-500 mt-1">Results will be sent to this email address after processing is complete.</p>
+                <p className="text-xs text-gray-500 mt-1">We'll check if you're registered and proceed accordingly.</p>
+                <div className="mt-3">
+                  <button
+                    onClick={handleEmailSubmit}
+                    disabled={isLoading || isCheckingUser || !userEmail.trim()}
+                    className={`py-2 px-4 rounded-md font-semibold text-sm transition-all duration-300 ease-in-out
+                                text-white disabled:opacity-50 disabled:cursor-not-allowed
+                                ${isCheckingUser
+                      ? 'bg-amber-600 animate-pulse'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                    }`}
+                  >
+                    {isCheckingUser ? (
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin mr-2" />
+                        Checking...
+                      </div>
+                    ) : 'Continue'}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {showRegistrationForm && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">New User Registration</h4>
+                  <p className="text-xs text-blue-700">
+                    Welcome! Since this is your first time using our service, please provide your details below.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="nameInput" className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      id="nameInput"
+                      type="text"
+                      className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm placeholder-gray-400"
+                      placeholder="Enter your full name"
+                      value={userName}
+                      onChange={(e) => setUserName(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="affiliationInput" className="block text-sm font-medium text-gray-700 mb-1">
+                      Affiliation *
+                    </label>
+                    <input
+                      id="affiliationInput"
+                      type="text"
+                      className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm placeholder-gray-400"
+                      placeholder="University, Company, Institution"
+                      value={userAffiliation}
+                      onChange={(e) => setUserAffiliation(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">* Required fields for new user registration</p>
               </motion.div>
             )}
 
             <div className="flex flex-col sm:flex-row gap-4">
               <motion.button
                 onClick={handleSubmit}
-                disabled={isLoading || (!textareaValue.trim() && !selectedFile)}
+                disabled={isLoading || (!textareaValue.trim() && !selectedFile) || showEmailInput || isCheckingUser || 
+                         (showRegistrationForm && (!userName.trim() || !userAffiliation.trim()))}
                 className={`w-full sm:w-auto flex-grow py-3 px-6 rounded-md font-semibold text-base transition-all duration-300 ease-in-out
                             text-white disabled:opacity-50 disabled:cursor-not-allowed
                             ${isLoading
@@ -606,7 +724,7 @@ export default function Home() {
                     <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin mr-2" />
                     Analyzing...
                   </div>
-                ) : 'Predict'}
+                ) : showRegistrationForm ? 'Register & Predict' : 'Predict'}
               </motion.button>
               <button onClick={clearInputs} disabled={isLoading}
                 className="w-full sm:w-auto py-3 px-6 rounded-md font-semibold text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors disabled:opacity-50">
