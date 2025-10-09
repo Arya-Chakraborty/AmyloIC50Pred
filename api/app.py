@@ -15,11 +15,14 @@ from io import StringIO
 import threading
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 CORS(app)
 
+load_dotenv()
 # Database configuration
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db_connection():
     """Get database connection"""
