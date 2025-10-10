@@ -260,7 +260,7 @@ export default function Home() {
 
   const checkUserExists = async (email) => {
     try {
-      const response = await fetch('http://127.0.0.1:5328/api/check-user', {
+      const response = await fetch('https://meet-man-splendid.ngrok-free.app/api/check-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
@@ -368,6 +368,17 @@ export default function Home() {
       setIsLoading(false); return;
     }
 
+    // For large batches, show immediate feedback before processing
+    if (isLargeBatch) {
+      setResults({
+        message: 'Processing started - please wait...',
+        email: userEmail.trim(),
+        compound_count: smilesToProcess.length,
+        isLargeBatch: true,
+        isProcessing: true
+      });
+    }
+
     try {
       const payload = { smiles: smilesToProcess };
       
@@ -392,10 +403,12 @@ export default function Home() {
         // Handle large batch response
         if (isLargeBatch && data.message) {
           setResults({ 
-            message: data.message,
+            message: 'Processing completed successfully!',
+            completionMessage: 'Your results will be sent to your email shortly.',
             email: data.email,
             compound_count: data.compound_count,
-            isLargeBatch: true
+            isLargeBatch: true,
+            isProcessing: false
           });
         } else {
           setResults(data);
@@ -756,19 +769,37 @@ export default function Home() {
                 )}
 
                 {results.isLargeBatch && results.message && (
-                  <div className="p-6 bg-green-50 border border-green-300 rounded-md text-green-800">
-                    <h3 className="text-lg font-semibold mb-2">✓ Large Batch Processing Started</h3>
+                  <div className={`p-6 rounded-md ${results.isProcessing ? 'bg-blue-50 border border-blue-300 text-blue-800' : 'bg-green-50 border border-green-300 text-green-800'}`}>
+                    <h3 className="text-lg font-semibold mb-2">
+                      {results.isProcessing ? '⏳ Large Batch Processing' : '✓ Large Batch Processing Completed'}
+                    </h3>
                     <div className="space-y-2 text-sm">
                       <p><strong>Status:</strong> {results.message}</p>
                       <p><strong>Email:</strong> {results.email}</p>
                       <p><strong>Compounds:</strong> {results.compound_count}</p>
-                      <div className="mt-3 p-3 bg-green-100 rounded">
-                        <p className="font-medium">What happens next?</p>
+                      {results.completionMessage && (
+                        <p><strong>Next Step:</strong> {results.completionMessage}</p>
+                      )}
+                      <div className={`mt-3 p-3 rounded ${results.isProcessing ? 'bg-blue-100' : 'bg-green-100'}`}>
+                        <p className="font-medium">
+                          {results.isProcessing ? 'Processing Information:' : 'What happens next?'}
+                        </p>
                         <ul className="mt-1 text-xs list-disc list-inside space-y-1">
-                          <li>Your compounds are being processed in the background</li>
-                          <li>Results will be emailed to you as a CSV file</li>
-                          <li>You can safely close this page</li>
-                          <li>Processing typically takes 2-5 minutes depending on batch size</li>
+                          {results.isProcessing ? (
+                            <>
+                              <li>Your batch of {results.compound_count} compounds is being processed</li>
+                              <li>Results will be sent to {results.email}</li>
+                              <li>Please wait while we analyze your compounds</li>
+                              <li>You can close this page</li>
+                            </>
+                          ) : (
+                            <>
+                              <li>Processing has been completed successfully</li>
+                              <li>Results email will be sent shortly to {results.email}</li>
+                              <li>You can safely close this page</li>
+                              <li>Check your email for the CSV file with detailed results</li>
+                            </>
+                          )}
                         </ul>
                       </div>
                     </div>
