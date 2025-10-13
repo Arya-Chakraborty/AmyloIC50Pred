@@ -208,7 +208,7 @@ def smiles_to_descriptors(smiles_list, compiled_data_path):
                            'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
                            'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
                            'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
-                           'TDB3i', 'VR2_D', 'GATS2i']
+                           'TDB3i', 'VR2_D', 'GATS2i', 'SHdsCH', 'ndsCH', 'E2m', 'AATSC2p']
     
     # Extract important descriptor values for each compound
     important_descriptor_values = []
