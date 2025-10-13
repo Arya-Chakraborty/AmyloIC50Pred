@@ -450,7 +450,7 @@ export default function Home() {
                             'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
                             'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
                             'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
-                            'TDB3i', 'VR2_D', 'GATS2i'];
+                            'TDB3i', 'VR2_D', 'GATS2i', 'SHdsCH', 'ndsCH', 'E2m', 'AATSC2p'];
     
     const headers = ["ID", "Compound (SMILES)", "Name", "Type", "Class", "IC50 (nM)", ...descriptorList];
     const csvRows = [
@@ -848,7 +848,7 @@ export default function Home() {
                               'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
                               'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
                               'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
-                              'TDB3i', 'VR2_D', 'GATS2i'].map(desc => (
+                              'TDB3i', 'VR2_D', 'GATS2i', 'SHdsCH', 'ndsCH', 'E2m', 'AATSC2p'].map(desc => (
                               <th key={desc} scope="col" className="px-2 py-3 text-left text-xs font-medium text-gray-800 uppercase tracking-wider">{desc}</th>
                             ))}
                           </tr>
@@ -885,7 +885,7 @@ export default function Home() {
                                 'RDF20p', 'RDF125s', 'RDF130v', 'RDF125e', 'RDF115m', 'RDF110s', 'nBondsD',
                                 'minssCH2', 'TDB1i', 'SHAvin', 'PPSA-3', 'Du', 'nHdsCH', 'SpMin2_Bhe', 
                                 'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
-                                'TDB3i', 'VR2_D', 'GATS2i'].map(desc => (
+                                'TDB3i', 'VR2_D', 'GATS2i', 'SHdsCH', 'ndsCH', 'E2m', 'AATSC2p'].map(desc => (
                                 <td key={desc} className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 font-mono">
                                   {item[desc] !== null && item[desc] !== undefined ? item[desc].toFixed(4) : '0.0000'}
                                 </td>
