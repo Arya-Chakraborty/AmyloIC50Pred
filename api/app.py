@@ -22,7 +22,7 @@ CORS(app)
 
 load_dotenv()
 # Database configuration
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = "postgresql://neondb_owner:npg_DI2qoK0whcXT@ep-winter-bush-ad2r2ffb-pooler.c-2.us-east-1.aws.neon.tech/neondb";
 
 def get_db_connection():
     """Get database connection"""
@@ -76,7 +76,7 @@ def send_results_email(user_email, results_data):
                       'SHBint4', 'minHBint4', 'AATS3v', 'TDB1u', 'TDB5m', 'ATSC2m', 'MATS5s', 
                       'TDB3i', 'VR2_D', 'GATS2i', 'SHdsCH', 'ndsCH', 'E2m', 'AATSC2p']
         
-        headers = ["ID", "Compound (SMILES)", "Type", "Class", "IC50 (nM)"] + descriptors
+        headers = ["ID", "Compound (SMILES)", "Name", "Type", "Class", "IC50 (nM)"] + descriptors
         
         writer = csv.writer(csv_content)
         writer.writerow(headers)
@@ -85,6 +85,7 @@ def send_results_email(user_email, results_data):
             row = [
                 idx + 1,
                 prediction['smiles'],
+                prediction.get('name', 'N/A') if prediction.get('name') else 'N/A',
                 prediction['classification'].capitalize(),
                 prediction['class'] if prediction['class'] is not None else 'N/A',
                 f"{prediction['ic50']:.2f}" if prediction['ic50'] is not None else 'N/A'
@@ -383,12 +384,21 @@ def predict():
             return jsonify({'error': 'No SMILES strings provided'}), 400
         
         smiles_list = data['smiles']
+        names_map = data.get('names', {})  # Dictionary mapping SMILES to names
         user_email = data.get('email', None)
         user_name = data.get('name', None)
         user_affiliation = data.get('affiliation', None)
         
+        # Debug: Print names_map to verify it's received
+        print(f"Received names_map: {names_map}")
+        print(f"Number of SMILES: {len(smiles_list)}, Number of names: {len(names_map)}")
+        
         if not isinstance(smiles_list, list):
             return jsonify({'error': 'SMILES should be provided as a list'}), 400
+        
+        # Validate names_map is a dictionary if provided
+        if names_map and not isinstance(names_map, dict):
+            return jsonify({'error': 'Names should be provided as a dictionary mapping SMILES to names'}), 400
         
         # Check if this is a large batch that requires email processing
         is_large_batch = len(smiles_list) > 20
@@ -421,34 +431,54 @@ def predict():
         inhibitors_df = di_df[di_df['D/I'] == 1].drop('D/I', axis=1)
         decoys_df = di_df[di_df['D/I'] == 0].drop('D/I', axis=1)
         
-        # Prepare response structure
-        response = []
-        
-        # Add decoy predictions to response
-        for idx, smiles in enumerate(smiles_list):
-            if idx in decoys_df.index:
-                response.append({
-                    'smiles': smiles,
-                    'classification': 'decoy',
-                    'class': None,
-                    'ic50': None,
-                    'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
-                })
-        
-        # Process inhibitors and add their predictions
+        # Process inhibitors to get classifications and IC50 predictions
+        inhibitor_results = {}
         if not inhibitors_df.empty:
             classified_df = potency_classification(inhibitors_df.copy())
             regressed_df = ic50_regression(classified_df.copy())
             
             for idx, row in regressed_df.iterrows():
-                if idx < len(smiles_list):  # Ensure index is within bounds
-                    response.append({
-                        'smiles': smiles_list[idx],
-                        'classification': 'inhibitor',
-                        'class': int(row['Class']),
-                        'ic50': float(row['IC50']),
-                        'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
-                    })
+                inhibitor_results[idx] = {
+                    'class': int(row['Class']),
+                    'ic50': float(row['IC50'])
+                }
+        
+        # Build response in the same order as input SMILES
+        response = []
+        for idx, smiles in enumerate(smiles_list):
+            # Get the name for this SMILES from the mapping
+            compound_name = names_map.get(smiles, None)
+            
+            if idx in decoys_df.index:
+                # This is a decoy
+                response.append({
+                    'smiles': smiles,
+                    'name': compound_name,
+                    'classification': 'decoy',
+                    'class': None,
+                    'ic50': None,
+                    'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
+                })
+            elif idx in inhibitor_results:
+                # This is an inhibitor
+                response.append({
+                    'smiles': smiles,
+                    'name': compound_name,
+                    'classification': 'inhibitor',
+                    'class': inhibitor_results[idx]['class'],
+                    'ic50': inhibitor_results[idx]['ic50'],
+                    'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
+                })
+            else:
+                # Fallback case - should not normally happen
+                response.append({
+                    'smiles': smiles,
+                    'name': compound_name,
+                    'classification': 'unknown',
+                    'class': None,
+                    'ic50': None,
+                    'descriptors': important_descriptor_values[idx] if idx < len(important_descriptor_values) else {}
+                })
         
         # Handle large batch processing with email
         if is_large_batch:

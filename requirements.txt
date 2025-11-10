@@ -1,2 +1,8 @@
-Flask==3.0.3
-psycopg2-binary==2.9.9
+Flask
+flask-cors
+numpy
+pandas
+padelpy
+psycopg2-binary
+python-dotenv
+scikit-learn

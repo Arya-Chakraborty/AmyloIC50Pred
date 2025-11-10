@@ -12,6 +12,7 @@ import {
 // --- Configuration ---
 const MAX_COMPOUNDS = 20;
 const API_URL = 'https://meet-man-splendid.ngrok-free.app/api/predict';
+// const API_URL = "http://127.0.0.1:5328/api/predict";
 // --- Helper Components / Icons ---
 const IconUpload = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
@@ -77,7 +78,7 @@ export default function Home() {
       const newTableData = results.predictions.map((item, index) => ({
         id: index + 1,
         smiles: item.smiles,
-        name: smilesToNames[item.smiles] || 'N/A',
+        name: item.name || 'N/A',  // Use name from API response
         type: item.classification.charAt(0).toUpperCase() + item.classification.slice(1),
         class: item.class !== null ? item.class : 'N/A',
         ic50: item.ic50 !== null ? item.ic50.toFixed(2) : 'N/A',
@@ -116,7 +117,7 @@ export default function Home() {
       setPieChartData([]);
       setBarChartData([]);
     }
-  }, [results, smilesToNames]);
+  }, [results]);  // Removed smilesToNames from dependencies since we use name from API response
 
   const readFileContent = useCallback((file) => {
     return new Promise((resolve, reject) => {
@@ -229,7 +230,7 @@ export default function Home() {
     // Update the global smilesToNames dictionary
     setSmilesToNames(localSmilesToNames);
     
-    return smilesFromFile;
+    return { smiles: smilesFromFile, namesMap: localSmilesToNames };
   }, []);
 
   const handleFileChange = (event) => {
@@ -316,12 +317,15 @@ export default function Home() {
   const handleSubmit = async () => {
     setIsLoading(true); setResults(null); setInputError('');
     let smilesToProcess = [];
-    const localSmilesToNames = {};
+    let localSmilesToNames = {};
 
     if (selectedFile) {
       try {
         const fileData = await readFileContent(selectedFile);
-        smilesToProcess = parseFileContent(fileData.content, fileData.isBinary, selectedFile.name);
+        const parseResult = parseFileContent(fileData.content, fileData.isBinary, selectedFile.name);
+        smilesToProcess = parseResult.smiles;
+        localSmilesToNames = parseResult.namesMap;
+        
         if (smilesToProcess.length === 0) {
           setInputError("No valid SMILES found in file. Check format (SMILES in first column, names in second column, optional header).");
           setIsLoading(false); return;
@@ -380,7 +384,10 @@ export default function Home() {
     }
 
     try {
-      const payload = { smiles: smilesToProcess };
+      const payload = { 
+        smiles: smilesToProcess,
+        names: localSmilesToNames  // Send names mapping to backend
+      };
       
       // Add email and user details for large batches
       if (isLargeBatch) {
