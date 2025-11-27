@@ -8,6 +8,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
+import MoleculeDrawer from './components/MoleculeDrawer';
 
 // --- Configuration ---
 const MAX_COMPOUNDS = 20;
@@ -47,6 +48,7 @@ export default function Home() {
   const [userAffiliation, setUserAffiliation] = useState(''); // User affiliation for registration
   const [showRegistrationForm, setShowRegistrationForm] = useState(false); // Show registration form for new users
   const [isCheckingUser, setIsCheckingUser] = useState(false); // Loading state for user check
+  const [activeInputTab, setActiveInputTab] = useState('text'); // 'text', 'file', or 'draw'
   const pathname = usePathname();
 
   const navLinks = [
@@ -252,6 +254,19 @@ export default function Home() {
     }
   };
 
+  const handleSmilesFromDrawing = (smilesString) => {
+    // Add the SMILES from the drawing to the textarea (append if there's existing content)
+    const currentValue = textareaValue.trim();
+    const newValue = currentValue ? `${currentValue}\n${smilesString}` : smilesString;
+    setTextareaValue(newValue);
+    setSelectedFile(null);
+    setFileName('');
+    setInputError('');
+    setResults(null);
+    // Switch to text tab to show the added SMILES
+    setActiveInputTab('text');
+  };
+
   const validateManualInput = (lines) => {
     if (lines.length > MAX_COMPOUNDS) {
       setInputError(`Manual input is limited to ${MAX_COMPOUNDS} compounds maximum. You provided ${lines.length} compounds.`);
@@ -435,6 +450,7 @@ export default function Home() {
     setUserEmail(''); setShowEmailInput(false);
     setUserName(''); setUserAffiliation(''); setShowRegistrationForm(false);
     setIsCheckingUser(false);
+    setActiveInputTab('text');
     const fileInput = document.getElementById('fileUpload');
     if (fileInput) fileInput.value = null;
   };
@@ -625,40 +641,93 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
             className={`bg-white/70 backdrop-blur-md shadow-xl rounded-xl p-6 sm:p-8 border ${brandColors.borderLight}`}
           >
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label htmlFor="smilesInput" className="block text-sm font-medium text-gray-700 mb-1">
-                  Enter SMILES Strings
-                </label>
-                <textarea
-                  id="smilesInput" rows={6}
-                  className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm font-mono placeholder-gray-400"
-                  placeholder={`CCC, Compound A\nCNC(=O)C1=CN=CN1, Compound B\nOne compound per line in format: SMILES, Name\nMax ${MAX_COMPOUNDS} compounds allowed`}
-                  value={textareaValue}
-                  onChange={(e) => { setTextareaValue(e.target.value); setSelectedFile(null); setFileName(''); setInputError(''); setResults(null); setSmilesToNames({}); }}
-                  disabled={isLoading}
-                />
+            {/* Input Method Tabs */}
+            <div className="mb-6">
+              <div className="border-b border-gray-200">
+                <nav className="-mb-px flex flex-col sm:flex-row sm:space-x-8 space-y-0" aria-label="Input methods">
+                  <button
+                    onClick={() => setActiveInputTab('text')}
+                    className={`${
+                      activeInputTab === 'text'
+                        ? 'border-amber-500 text-amber-600 sm:border-b-2 border-l-4 sm:border-l-0'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } py-3 sm:py-4 px-4 sm:px-1 border-b sm:border-b-2 border-l-4 sm:border-l-0 font-medium text-sm transition-colors text-left`}
+                  >
+                    ✍️ Enter SMILES
+                  </button>
+                  <button
+                    onClick={() => setActiveInputTab('draw')}
+                    className={`${
+                      activeInputTab === 'draw'
+                        ? 'border-amber-500 text-amber-600 sm:border-b-2 border-l-4 sm:border-l-0'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } py-3 sm:py-4 px-4 sm:px-1 border-b sm:border-b-2 border-l-4 sm:border-l-0 font-medium text-sm transition-colors text-left`}
+                  >
+                    🎨 Draw Molecule
+                  </button>
+                  <button
+                    onClick={() => setActiveInputTab('file')}
+                    className={`${
+                      activeInputTab === 'file'
+                        ? 'border-amber-500 text-amber-600 sm:border-b-2 border-l-4 sm:border-l-0'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } py-3 sm:py-4 px-4 sm:px-1 border-b sm:border-b-2 border-l-4 sm:border-l-0 font-medium text-sm transition-colors text-left`}
+                  >
+                    📁 Upload File
+                  </button>
+                </nav>
               </div>
-              <div>
-                <label htmlFor="fileUpload" className="block text-sm font-medium text-gray-700 mb-1">
-                  Or Upload File
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-amber-500 transition-colors">
-                  <div className="space-y-1 text-center">
-                    <div className="flex text-sm text-gray-600">
+            </div>
+
+            {/* Input Content Area */}
+            <div className="mb-6">
+              {activeInputTab === 'text' && (
+                <div>
+                  <label htmlFor="smilesInput" className="block text-sm font-medium text-gray-700 mb-2">
+                    Enter SMILES Strings
+                  </label>
+                  <textarea
+                    id="smilesInput" rows={10}
+                    className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 bg-gray-50 text-sm font-mono placeholder-gray-400"
+                    placeholder={`CCC, Compound A\nCNC(=O)C1=CN=CN1, Compound B\nOne compound per line in format: SMILES, Name\nMax ${MAX_COMPOUNDS} compounds allowed for manual input`}
+                    value={textareaValue}
+                    onChange={(e) => { setTextareaValue(e.target.value); setSelectedFile(null); setFileName(''); setInputError(''); setResults(null); setSmilesToNames({}); }}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+
+              {activeInputTab === 'draw' && (
+                <div>
+                  <MoleculeDrawer 
+                    onSmilesExtracted={handleSmilesFromDrawing}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+
+              {activeInputTab === 'file' && (
+                <div>
+                  <label htmlFor="fileUpload" className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload File with SMILES
+                  </label>
+                  <div className="mt-1 border-2 border-gray-300 border-dashed rounded-md hover:border-amber-500 transition-colors">
+                    <div className="flex flex-col items-center justify-center px-4 py-16 space-y-3">
                       <IconUpload />
-                      <label htmlFor="fileUpload" className="relative cursor-pointer bg-white rounded-md font-medium text-amber-600 hover:text-amber-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-amber-500 px-1">
-                        <span>Upload a file</span>
-                        <input id="fileUpload" name="fileUpload" type="file" className="sr-only"
-                          accept=".csv, .xlsx, .xls" onChange={handleFileChange} disabled={isLoading} />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
+                      <div className="text-center space-y-2">
+                        <label htmlFor="fileUpload" className="cursor-pointer font-medium text-amber-600 hover:text-amber-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-amber-500 text-sm block">
+                          <span>Upload a file</span>
+                          <input id="fileUpload" name="fileUpload" type="file" className="sr-only"
+                            accept=".csv, .xlsx, .xls" onChange={handleFileChange} disabled={isLoading} />
+                        </label>
+                        <p className="text-sm text-gray-600">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500 text-center max-w-xs">CSV, XLSX, XLS up to 1MB. SMILES in first column, names in second column.</p>
+                      {fileName && <p className="text-xs text-amber-600 font-medium break-all max-w-xs text-center">✓ Selected: {fileName}</p>}
                     </div>
-                    <p className="text-xs text-gray-500">CSV, XLSX, XLS up to 1MB. SMILES in first column, names in second column.</p>
-                    {fileName && <p className="text-xs text-amber-600 mt-1">Selected: {fileName}</p>}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {inputError && (
