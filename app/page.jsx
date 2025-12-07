@@ -54,6 +54,7 @@ export default function Home() {
   const navLinks = [
     { name: 'Predict', path: '/' },
     { name: 'Manual', path: 'https://drive.google.com/file/d/1AWgw5f13s9exTQxYk1WEqm0dV9QpJOd-/view?usp=sharing', external: true },
+    { name: 'Cite This', path: 'https://pubs.acs.org/doi/10.1021/acschemneuro.5c00649', external: true },
     { name: 'Contact us', path: '/contact' }
   ];
 

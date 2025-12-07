@@ -17,13 +17,12 @@ const Contact = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const navLinks = [
-        { name: 'Predict', path: '/' },
-        { name: 'Manual', path: 'https://drive.google.com/file/d/1AWgw5f13s9exTQxYk1WEqm0dV9QpJOd-/view?usp=sharing', external: true },
-        { name: 'Contact us', path: '/contact' }
-    ];
-
-    // Define custom colors based on your logo for Tailwind CSS
+  const navLinks = [
+    { name: 'Predict', path: '/' },
+    { name: 'Manual', path: 'https://drive.google.com/file/d/1AWgw5f13s9exTQxYk1WEqm0dV9QpJOd-/view?usp=sharing', external: true },
+    { name: 'Cite This', path: 'https://pubs.acs.org/doi/10.1021/acschemneuro.5c00649', external: true },
+    { name: 'Contact us', path: '/contact' }
+  ];    // Define custom colors based on your logo for Tailwind CSS
     // These would ideally be defined in your tailwind.config.js for broader use
     // For this example, I'm using direct color values or closest Tailwind defaults.
     // Orange: Closest to yellow-600/700 or orange-500
